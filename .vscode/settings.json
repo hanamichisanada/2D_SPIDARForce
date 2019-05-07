@@ -1,0 +1,6 @@
+{
+    "terminal.integrated.env.osx": {
+        "PATH": "/Users/masato/.platformio/penv/bin:/Users/masato/.platformio/penv:/Users/masato/.pyenv/shims:/Users/masato/.pyenv/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Library/TeX/texbin:/usr/local/share/dotnet:~/.dotnet/tools:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/Users/masato/Library/Android/sdk/platform-tools:/Users/masato/Library/Android/sdk/platform-tools:/Users/no136/.nodebrew/current/bin:/Users/no136/.nodebrew/current/bin:/Users/masato/.nodebrew/current/bin",
+        "PLATFORMIO_CALLER": "vscode"
+    }
+}
