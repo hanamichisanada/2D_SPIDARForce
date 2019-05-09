@@ -76,6 +76,7 @@ void setup() {
   pinMode(motor3,OUTPUT);
   pinMode(motor4,OUTPUT);
 
+/*
   pinMode(enc1a,INPUT);
   pinMode(enc1b,INPUT);
   pinMode(enc2a,INPUT);
@@ -84,6 +85,7 @@ void setup() {
   pinMode(enc3b,INPUT);
   pinMode(enc4a,INPUT);
   pinMode(enc4b,INPUT);
+*/
 
   ledcSetup(1, PWM_HZ,10);
   ledcSetup(2, PWM_HZ,10);
@@ -98,6 +100,8 @@ void setup() {
   Serial.begin(115200);
 }
 
+long oldPosition = 0;
+
 void loop() {
   /*
   ledcWrite(0,200);
@@ -111,18 +115,45 @@ void loop() {
   motorOut(4, OFFSET_FORECE);
 
   calcPos();
+  
 }
 
+
+long counta = 0;
+
 void calcPos(){
+
   int l1 = myEnc1.read();
   int l2 = myEnc2.read();
   int l3 = myEnc3.read();
   int l4 = myEnc4.read();
 
-  Serial.println(l1);
 
-  posX = (l2*l2 - l1*l1)/4;
-  posY = (l3*l3 - l2*l2)/4;
+  l1 += 8000;
+  l2 += 8000;
+  l3 += 8000;
+  l4 += 8000;
+
+  //Serial.println(l1);
+
+
+  posX = (l2*l2 - l3*l3)/4000000;
+  posY = (l1*l1 - l2*l2)/4000000;
+
+
+counta++;
+
+if(counta%10000 == 0){
+  
+  
+  Serial.print("(");
+  Serial.print(posX);
+  Serial.print(",");
+  Serial.print(posY);
+  Serial.println(")");
+  
+}
+
 }
 
 
