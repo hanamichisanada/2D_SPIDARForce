@@ -130,21 +130,26 @@ void calcPos(){
 
 
   l1 += 8000;
-  l2 += 8000;
-  l3 += 8000;
+  l2 -= 8000;
+  l3 -= 8000;
   l4 += 8000;
 
   //Serial.println(l1);
 
-
-  posX = (l2*l2 - l3*l3)/4000000;
-  posY = (l1*l1 - l2*l2)/4000000;
+  posY = (l2*l2 - l3*l3)/4000000;
+  posX = (l1*l1 - l2*l2)/4000000;
 
 
 counta++;
 
 if(counta%10000 == 0){
-  
+
+  /*
+  Serial.print(l1);
+  Serial.print(l2);
+  Serial.print(l3);
+  Serial.println(l4);
+  */
   
   Serial.print("(");
   Serial.print(posX);
