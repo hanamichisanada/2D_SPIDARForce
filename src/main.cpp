@@ -43,15 +43,20 @@ Encoder myEnc3(enc3a,enc3b);
 
 float posX = 0.0f;
 float posY = 0.0f;
+short shortFx = 0;
+short shortFy = 0;
 
 /* 関数のプロトタイプ宣言 */
 void motorOut(int, int);
+void motorsReset(void);
 void calcPos();
 void forceFeedback(float, float);
 void calcMotorForce(int, int, float, float);
 int SelectOutChannel(int);
 int ForceFeedback(int, int);
 void checkControlPoint();
+void sendSerial();
+void receiveSerial();
 
 void setup() {
   pinMode(motor0,OUTPUT);
@@ -86,28 +91,22 @@ void setup() {
 long oldPosition = 0;
 
 void loop() {
-  /*
-  ledcWrite(0,200);
-  ledcWrite(1,200);
-  ledcWrite(2,200);
-  ledcWrite(3,200);
-  */
-
-  /*
-  motorOut(0, OFFSET_FORECE);
-  motorOut(1, OFFSET_FORECE);
-  motorOut(2, OFFSET_FORECE);
-  motorOut(3, OFFSET_FORECE);
-  */
 
   calcPos();
-  //forceFeedback(posX,posY);
-  checkControlPoint();
+  motorsReset();
+  sendSerial();
+  receiveSerial();
+  forceFeedback(shortFx/10,shortFy/10);
+  //checkControlPoint();
   
 }
 
 
-long counta = 0;
+void motorsReset(){
+  for(int i=0; i<4; i++){
+    motorOut(i, OFFSET_FORECE);
+  }
+}
 
 void calcPos(){
 
@@ -124,22 +123,8 @@ void calcPos(){
 
   //Serial.println(l1);
 
-  posY = (l1*l1 - l2*l2)/4000000;
-  posX = (l0*l0 - l1*l1)/4000000;
-
-
-  counta++;
-
-
-  if(counta%10000 == 0){
-    
-    Serial.print("(");
-    Serial.print(posX);
-    Serial.print(",");
-    Serial.print(posY);
-    Serial.println(")");
-    
-  }
+  posY = (l1*l1 - l2*l2)/400000;
+  posX = (l0*l0 - l1*l1)/400000;
 }
 
 void checkControlPoint(){
@@ -174,20 +159,16 @@ void forceFeedback(float fx, float fy){
 
   if(-45.0f < deg && deg < 45.0f){
     calcMotorForce(1, 2, fx, fy);
-    //Serial.println("0");
   }
   else if(45.0f < deg && deg <= 135.0f){
-    calcMotorForce(2,3, fx, fy);
-    //Serial.println("1");
+    calcMotorForce(2, 3, fx, fy);
   }
   else if((135.0f < deg && deg <= 180.0f) ||
     (-180.0f < rad && rad <= -135.0f)){
-    calcMotorForce(3,0, fx, fy);
-    //Serial.println("2");
+    calcMotorForce(3, 0, fx, fy);
   }
   else if(-135.0f < deg && deg <= -45.0f){
-    calcMotorForce(0,1, fx, fy);
-   //Serial.println("3");
+    calcMotorForce(0, 1, fx, fy);
   }
   else{
     Serial.println("Error");
@@ -200,22 +181,20 @@ void forceFeedback(float fx, float fy){
 void calcMotorForce(int m1, int m2, float fx, float fy){
   float x0 = 1.0f, y0 = 0.0f;
 
-  float theta = atan2f(motorPos[m1][1]-y0, motorPos[m1][0]-x0);
-  float phi = atan2f(motorPos[m2][1]-y0, motorPos[m2][0]-x0);
+  float theta = atan2f(motorPos[m1][1]-posY-y0, motorPos[m1][0]-posX-x0);
+  float phi = atan2f(motorPos[m2][1]-posY-y0, motorPos[m2][0]-posX-x0);
 
   float A = cosf(theta), B = cosf(phi);
   float C = sinf(theta), D = sinf(phi);
 
   float Fv = (A*fy - C*fx)/(A*D-C*B);
   float Fu = (fx - Fv*B)/A;
-  
-  Serial.print(Fu);
-  Serial.print(",");
-  Serial.println(Fv);
+
   for(int i=0; i<4; i++)
     motorOut(i,OFFSET_FORECE);
-  motorOut(m1, (int)fabs(Fu));
-  motorOut(m2, (int)fabs(Fv));
+
+  motorOut(m1, (int)fabs(10*Fu));
+  motorOut(m2, (int)fabs(10*Fv));
 }
 
 int ForceFeedback(int current,int target){
@@ -230,6 +209,25 @@ motor:動かすモータ番号，value:値
 */
 void motorOut(int motor, int value){
   ledcWrite(motor,constrain(fabs(value),COUNT_LOW,COUNT_HIGH));
+}
+
+/*
+シリアル通信でUnityに座標を送る関数
+*/
+
+void sendSerial(){
+  Serial.print(posX);
+  Serial.print(",");
+  Serial.println(posY);
+}
+
+void receiveSerial(){
+  if(Serial.available()){
+    shortFx = Serial.read()*256;
+    shortFx = shortFx+Serial.read();
+    shortFy = Serial.read()*256;
+    shortFy = shortFy+Serial.read();
+  }
 }
 
 /*
