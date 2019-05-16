@@ -9,7 +9,7 @@
 
 //#define testAna  A0//テスト用アナログ出力
 //#define testDig 21
-#define Kp 100
+#define Kp 40
 
 int mode = 0; //0:力が釣り合っているモード, 1:力が発生するモード
 float currentX = 0.0f; //x軸の座標
@@ -52,9 +52,7 @@ void motorsReset(void);
 void calcPos();
 void forceFeedback(float, float);
 void calcMotorForce(int, int, float, float);
-int SelectOutChannel(int);
 int ForceFeedback(int, int);
-void checkControlPoint();
 void sendSerial();
 void receiveSerial();
 
@@ -88,19 +86,16 @@ void setup() {
   Serial.begin(115200);
 }
 
-long oldPosition = 0;
-
 void loop() {
 
   calcPos();
   motorsReset();
   sendSerial();
   receiveSerial();
-  forceFeedback(shortFx/10,shortFy/10);
-  //checkControlPoint();
+  //motorsReset();
+  forceFeedback(shortFx,shortFy);
   
 }
-
 
 void motorsReset(){
   for(int i=0; i<4; i++){
@@ -127,35 +122,16 @@ void calcPos(){
   posX = (l0*l0 - l1*l1)/400000;
 }
 
-void checkControlPoint(){
-  float r = 5.0f;
-  float square = posX*posX+posY*posY;
-
-  //円の領域内に入ったら
-  if(square < r*r){
-    float fx = posX/square;
-    float fy = posY/square;
-    forceFeedback(Kp*fx,Kp*fy);
-  }
-  //領域外の時
-  else{
-    motorOut(0, OFFSET_FORECE);
-    motorOut(1, OFFSET_FORECE);
-    motorOut(2, OFFSET_FORECE);
-    motorOut(3, OFFSET_FORECE);
-  }
-}
-
 /*
   力ベクトルに応じて動かすモータを選択する関数
 */
 void forceFeedback(float fx, float fy){
-  float x0 = 1.0f, y0 = 0.0f;
-  float rad = atan2f(fy-y0, fx-x0); //x軸と力ベクトルのなす角を計算
+  float rad = atan2f(fy, fx); //x軸と力ベクトルのなす角を計算
 
   float deg = 180*rad/PI;
 
   //Serial.println(deg);
+  motorsReset();
 
   if(-45.0f < deg && deg < 45.0f){
     calcMotorForce(1, 2, fx, fy);
@@ -179,22 +155,22 @@ void forceFeedback(float fx, float fy){
  モータに加わる力を計算する関数
 */
 void calcMotorForce(int m1, int m2, float fx, float fy){
-  float x0 = 1.0f, y0 = 0.0f;
 
-  float theta = atan2f(motorPos[m1][1]-posY-y0, motorPos[m1][0]-posX-x0);
-  float phi = atan2f(motorPos[m2][1]-posY-y0, motorPos[m2][0]-posX-x0);
+  float square = posX*posX + posY*posY;
+  float nx = posX/sqrt(square);
+  float ny = posY/sqrt(square);
+
+  float theta = atan2f(motorPos[m1][1]-ny, motorPos[m1][0]-nx); //ここがおかしい?
+  float phi = atan2f(motorPos[m2][1]-ny, motorPos[m2][0]-nx);
 
   float A = cosf(theta), B = cosf(phi);
   float C = sinf(theta), D = sinf(phi);
 
+  float Fu = (D*fx - B*fy)/(A*D-C*B);
   float Fv = (A*fy - C*fx)/(A*D-C*B);
-  float Fu = (fx - Fv*B)/A;
 
-  for(int i=0; i<4; i++)
-    motorOut(i,OFFSET_FORECE);
-
-  motorOut(m1, (int)fabs(10*Fu));
-  motorOut(m2, (int)fabs(10*Fv));
+  motorOut(m1, (int)fabs(Kp*Fu));
+  motorOut(m2, (int)fabs(Kp*Fv));
 }
 
 int ForceFeedback(int current,int target){
@@ -227,30 +203,5 @@ void receiveSerial(){
     shortFx = shortFx+Serial.read();
     shortFy = Serial.read()*256;
     shortFy = shortFy+Serial.read();
-  }
-}
-
-/*
-出力に使うpwmの出力チャンネルを選ぶ関数
- */
-int SelectOutChannel(int motor){
-  switch (motor)
-  {
-    case 0:
-      return 0; //pwmの出力チャンネル
-      break;
-    case 1:
-      return 1;
-      break;
-    case 2:
-      return 2;
-      break;
-    case 3:
-      return 3;
-      break;
-  
-    default:
-      return 0;
-      break;
   }
 }
