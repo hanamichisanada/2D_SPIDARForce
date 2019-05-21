@@ -9,7 +9,7 @@
 
 //#define testAna  A0//テスト用アナログ出力
 //#define testDig 21
-#define Kp 40
+#define Kp 30
 
 int mode = 0; //0:力が釣り合っているモード, 1:力が発生するモード
 float currentX = 0.0f; //x軸の座標
@@ -55,6 +55,14 @@ void calcMotorForce(int, int, float, float);
 int ForceFeedback(int, int);
 void sendSerial();
 void receiveSerial();
+
+float debugFu = 0.0f;
+float debugFv = 0.0f;
+float debugTheta = 0.0f;
+float debugPhi = 0.0f;
+float debugDeg = 0.0f;
+float debugnx = 0.0f;
+float debugny = 0.0f;
 
 void setup() {
   pinMode(motor0,OUTPUT);
@@ -128,23 +136,25 @@ void calcPos(){
 void forceFeedback(float fx, float fy){
   float rad = atan2f(fy, fx); //x軸と力ベクトルのなす角を計算
 
-  float deg = 180*rad/PI;
+  float deg = 180*rad/PI - PI/4;
+  debugDeg = -(atan2f(posX,posY)-PI/2)*180/PI; //ここおかしそう
 
   //Serial.println(deg);
   motorsReset();
 
   if(-45.0f < deg && deg < 45.0f){
-    calcMotorForce(1, 2, fx, fy);
+    calcMotorForce(2, 1, fx, fy);
   }
+  
   else if(45.0f < deg && deg <= 135.0f){
-    calcMotorForce(2, 3, fx, fy);
+    calcMotorForce(3, 2, fx, fy);
   }
   else if((135.0f < deg && deg <= 180.0f) ||
     (-180.0f < rad && rad <= -135.0f)){
-    calcMotorForce(3, 0, fx, fy);
+    calcMotorForce(0, 3, fx, fy);
   }
   else if(-135.0f < deg && deg <= -45.0f){
-    calcMotorForce(0, 1, fx, fy);
+    calcMotorForce(1, 0, fx, fy);
   }
   else{
     Serial.println("Error");
@@ -157,17 +167,29 @@ void forceFeedback(float fx, float fy){
 void calcMotorForce(int m1, int m2, float fx, float fy){
 
   float square = posX*posX + posY*posY;
-  float nx = posX/sqrt(square);
-  float ny = posY/sqrt(square);
+  //float nx = posX/sqrt(square);
+  //float ny = posY/sqrt(square);
 
-  float theta = atan2f(motorPos[m1][1]-ny, motorPos[m1][0]-nx); //ここがおかしい?
-  float phi = atan2f(motorPos[m2][1]-ny, motorPos[m2][0]-nx);
+  float nx = posX/100.0f;
+  float ny = posY/100.0f;
+
+  float theta = (atan2f(motorPos[m1][1]-posY, motorPos[m1][0]-posX)); //ここがおかしい?
+  float phi = -(atan2f(motorPos[m2][1]-posY, motorPos[m2][0]-posX));
 
   float A = cosf(theta), B = cosf(phi);
   float C = sinf(theta), D = sinf(phi);
 
   float Fu = (D*fx - B*fy)/(A*D-C*B);
   float Fv = (A*fy - C*fx)/(A*D-C*B);
+
+  debugFu = Fu;
+  debugFv = Fv;
+
+  debugTheta = theta;
+  debugPhi = phi;
+
+  debugnx = nx;
+  debugny = ny;
 
   motorOut(m1, (int)fabs(Kp*Fu));
   motorOut(m2, (int)fabs(Kp*Fv));
@@ -194,14 +216,51 @@ void motorOut(int motor, int value){
 void sendSerial(){
   Serial.print(posX);
   Serial.print(",");
-  Serial.println(posY);
+  Serial.print(posY);
+  Serial.print(",");
+  Serial.print(debugFu);
+  Serial.print(",");
+  Serial.print(debugFv);
+  Serial.print(",");
+  Serial.print(debugTheta);
+  Serial.print(",");
+  Serial.println(debugPhi);
 }
 
 void receiveSerial(){
   if(Serial.available()){
-    shortFx = Serial.read()*256;
-    shortFx = shortFx+Serial.read();
-    shortFy = Serial.read()*256;
-    shortFy = shortFy+Serial.read();
+    byte header = Serial.read();
+    if(header == 0xFE){
+      shortFx = Serial.read()*256;
+      shortFx = shortFx+Serial.read();
+      shortFy = Serial.read()*256;
+      shortFy = shortFy+Serial.read();
+    }
+    else if(header == 0xFF){
+      char ch = Serial.read();
+      switch (ch)
+      {
+      case '0':
+        motorPos[0][0] = posX;
+        motorPos[0][1] = posY;
+        break;
+
+      case '1':
+        motorPos[1][0] = posX;
+        motorPos[1][1] = posY;
+        break;
+      case '2':
+        motorPos[2][0] = posX;
+        motorPos[2][1] = posY;
+        break;
+      case '3':
+        motorPos[3][0] = posX;
+        motorPos[3][1] = posY;
+        break;
+      
+      default:
+        break;
+      }
+    }
   }
 }
