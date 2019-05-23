@@ -9,7 +9,7 @@
 
 //#define testAna  A0//テスト用アナログ出力
 //#define testDig 21
-#define Kp 30
+#define Kp 60
 
 int mode = 0; //0:力が釣り合っているモード, 1:力が発生するモード
 float currentX = 0.0f; //x軸の座標
@@ -52,7 +52,6 @@ void motorsReset(void);
 void calcPos();
 void forceFeedback(float, float);
 void calcMotorForce(int, int, float, float);
-int ForceFeedback(int, int);
 void sendSerial();
 void receiveSerial();
 
@@ -136,8 +135,8 @@ void calcPos(){
 void forceFeedback(float fx, float fy){
   float rad = atan2f(fy, fx); //x軸と力ベクトルのなす角を計算
 
-  float deg = 180*rad/PI - PI/4;
-  debugDeg = -(atan2f(posX,posY)-PI/2)*180/PI; //ここおかしそう
+  float deg = 180*rad/PI;
+  debugDeg =  deg;//ここおかしそう
 
   //Serial.println(deg);
   motorsReset();
@@ -157,7 +156,8 @@ void forceFeedback(float fx, float fy){
     calcMotorForce(1, 0, fx, fy);
   }
   else{
-    Serial.println("Error");
+    calcMotorForce(1,0,0,0);
+    //Serial.println("Error");
   }
 }
 
@@ -165,16 +165,8 @@ void forceFeedback(float fx, float fy){
  モータに加わる力を計算する関数
 */
 void calcMotorForce(int m1, int m2, float fx, float fy){
-
-  float square = posX*posX + posY*posY;
-  //float nx = posX/sqrt(square);
-  //float ny = posY/sqrt(square);
-
-  float nx = posX/100.0f;
-  float ny = posY/100.0f;
-
-  float theta = (atan2f(motorPos[m1][1]-posY, motorPos[m1][0]-posX)); //ここがおかしい?
-  float phi = -(atan2f(motorPos[m2][1]-posY, motorPos[m2][0]-posX));
+  float theta = (atan2f(motorPos[m1][1]-posY, motorPos[m1][0]-posX));
+  float phi = (atan2f(motorPos[m2][1]-posY, motorPos[m2][0]-posX));
 
   float A = cosf(theta), B = cosf(phi);
   float C = sinf(theta), D = sinf(phi);
@@ -185,20 +177,10 @@ void calcMotorForce(int m1, int m2, float fx, float fy){
   debugFu = Fu;
   debugFv = Fv;
 
-  debugTheta = theta;
-  debugPhi = phi;
-
-  debugnx = nx;
-  debugny = ny;
-
+  debugTheta = theta*180/PI;
+  debugPhi = phi*180/PI;
   motorOut(m1, (int)fabs(Kp*Fu));
   motorOut(m2, (int)fabs(Kp*Fv));
-}
-
-int ForceFeedback(int current,int target){
-  int errPos = target - current;
-  int ctrlValue = errPos*Kp;
-  return ctrlValue;
 }
 
 /*
@@ -224,7 +206,9 @@ void sendSerial(){
   Serial.print(",");
   Serial.print(debugTheta);
   Serial.print(",");
-  Serial.println(debugPhi);
+  Serial.print(debugPhi);
+  Serial.print(",");
+  Serial.println(debugDeg);
 }
 
 void receiveSerial(){
