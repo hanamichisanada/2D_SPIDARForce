@@ -5,11 +5,12 @@
 #define COUNT_HIGH 1023
 #define ENC_MAX 2000
 #define PULLY_R 1.0 //仮の数字
-#define OFFSET_FORECE 100
+#define OFFSET_FORECE 80
+#define TAP 100 //平均化フィルタのタップ数
 
 //#define testAna  A0//テスト用アナログ出力
 //#define testDig 21
-#define Kp 60
+#define Kp 5
 
 int mode = 0; //0:力が釣り合っているモード, 1:力が発生するモード
 float currentX = 0.0f; //x軸の座標
@@ -45,6 +46,8 @@ float posX = 0.0f;
 float posY = 0.0f;
 short shortFx = 0;
 short shortFy = 0;
+short prevFx = 0;
+short prevFy = 0;
 
 /* 関数のプロトタイプ宣言 */
 void motorOut(int, int);
@@ -54,6 +57,7 @@ void forceFeedback(float, float);
 void calcMotorForce(int, int, float, float);
 void sendSerial();
 void receiveSerial();
+float aveFilter(int, short);
 
 float debugFu = 0.0f;
 float debugFv = 0.0f;
@@ -63,22 +67,14 @@ float debugDeg = 0.0f;
 float debugnx = 0.0f;
 float debugny = 0.0f;
 
+//平均化フィルタ
+short force_prev[TAP][2]={};
+
 void setup() {
   pinMode(motor0,OUTPUT);
   pinMode(motor1,OUTPUT);
   pinMode(motor2,OUTPUT);
   pinMode(motor3,OUTPUT);
-
-/*
-  pinMode(enc1a,INPUT);
-  pinMode(enc1b,INPUT);
-  pinMode(enc2a,INPUT);
-  pinMode(enc2b,INPUT);
-  pinMode(enc3a,INPUT);
-  pinMode(enc3b,INPUT);
-  pinMode(enc4a,INPUT);
-  pinMode(enc4b,INPUT);
-*/
 
   ledcSetup(0, PWM_HZ,10);
   ledcSetup(1, PWM_HZ,10);
@@ -100,7 +96,10 @@ void loop() {
   sendSerial();
   receiveSerial();
   //motorsReset();
-  forceFeedback(shortFx,shortFy);
+  short fx = aveFilter(0, shortFx);
+  short fy = aveFilter(1, shortFy);
+  forceFeedback(fx,fy);
+  //forceFeedback(shortFx,shortFy);
   
 }
 
@@ -136,7 +135,7 @@ void forceFeedback(float fx, float fy){
   float rad = atan2f(fy, fx); //x軸と力ベクトルのなす角を計算
 
   float deg = 180*rad/PI;
-  debugDeg =  deg;//ここおかしそう
+  debugDeg =  deg;
 
   //Serial.println(deg);
   motorsReset();
@@ -188,7 +187,21 @@ void calcMotorForce(int m1, int m2, float fx, float fy){
 motor:動かすモータ番号，value:値
 */
 void motorOut(int motor, int value){
+  if(value < OFFSET_FORECE)
+    value = OFFSET_FORECE;
   ledcWrite(motor,constrain(fabs(value),COUNT_LOW,COUNT_HIGH));
+}
+
+float aveFilter(int axis, short currentForce){
+  for(int i=0; i<TAP-1; i++)
+    force_prev[i][axis] = force_prev[i+1][axis];
+  force_prev[TAP-1][axis] = currentForce;
+
+  short sum = 0;
+  for(int i=0; i<TAP; i++)
+    sum += force_prev[i][axis];
+
+  return sum/TAP;
 }
 
 /*
@@ -196,25 +209,32 @@ void motorOut(int motor, int value){
 */
 
 void sendSerial(){
+  Serial.println((String)posX+","+(String)posY);//1回で送れるようにする
+  /*
   Serial.print(posX);
   Serial.print(",");
   Serial.print(posY);
   Serial.print(",");
   Serial.print(debugFu);
   Serial.print(",");
-  Serial.print(debugFv);
+  Serial.println(debugFv);
+  /*
   Serial.print(",");
   Serial.print(debugTheta);
   Serial.print(",");
   Serial.print(debugPhi);
   Serial.print(",");
   Serial.println(debugDeg);
+  */
 }
 
 void receiveSerial(){
   if(Serial.available()){
     byte header = Serial.read();
     if(header == 0xFE){
+      prevFx = shortFx;
+      prevFy = shortFy;
+
       shortFx = Serial.read()*256;
       shortFx = shortFx+Serial.read();
       shortFy = Serial.read()*256;
