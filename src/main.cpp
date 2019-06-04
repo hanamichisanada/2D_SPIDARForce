@@ -10,15 +10,15 @@
 
 //#define testAna  A0//テスト用アナログ出力
 //#define testDig 21
-#define Kp 5
+#define Kp 1
 
 int mode = 0; //0:力が釣り合っているモード, 1:力が発生するモード
 float currentX = 0.0f; //x軸の座標
 float prevX = 0.0f;
 
-int motor0 = 14;  //モータ0
+int motor0 = 32;  //モータ0 14->32
 int enc0a = 27;   //モータ0エンコーダa相
-int enc0b = 26;   //モータ0エンコーダb相
+int enc0b = 14;   //モータ0エンコーダb相 26->14
 
 int motor1 = 4;  //モータ1
 int enc1a = 35;   //モータ1エンコーダa相
@@ -28,9 +28,12 @@ int motor2 = 33;  //モータ2
 int enc2a = 18;   //モータ2エンコーダa相
 int enc2b = 19;   //モータ2エンコーダb相
 
-int motor3 = 25;  //モータ3
+int motor3 = 2;  //モータ3 32->2
 int enc3a = 34;   //モータ3エンコーダa相
 int enc3b = 36;   //モータ3エンコーダb相
+
+int debugA = 25; //デバッグ用ピンA
+int debugB = 26; //デバッグ用ピンB
 
 //モータの仮想的な座標
 int motorPos[4][2] = {{-1,-1}, {1,-1}, {1,1}, {-1,1}};
@@ -92,15 +95,14 @@ void setup() {
 void loop() {
 
   calcPos();
-  motorsReset();
+  //motorsReset();
   sendSerial();
   receiveSerial();
   //motorsReset();
-  short fx = aveFilter(0, shortFx);
-  short fy = aveFilter(1, shortFy);
-  forceFeedback(fx,fy);
-  //forceFeedback(shortFx,shortFy);
-  
+  //short fx = aveFilter(0, shortFx);
+  //short fy = aveFilter(1, shortFy);
+  //forceFeedback(fx,fy);
+  forceFeedback(shortFx,shortFy);
 }
 
 void motorsReset(){
@@ -117,13 +119,12 @@ void calcPos(){
   int l3 = myEnc3.read();
 
 
-  l0 += 8000;
+  l0 -= 8000;
   l1 -= 8000;
   l2 -= 8000;
-  l3 += 8000;
+  l3 -= 8000;
 
   //Serial.println(l1);
-
   posY = (l1*l1 - l2*l2)/400000;
   posX = (l0*l0 - l1*l1)/400000;
 }
@@ -138,21 +139,29 @@ void forceFeedback(float fx, float fy){
   debugDeg =  deg;
 
   //Serial.println(deg);
-  motorsReset();
+  //motorsReset();
 
   if(-45.0f < deg && deg < 45.0f){
     calcMotorForce(2, 1, fx, fy);
+    motorOut(0,OFFSET_FORECE);
+    motorOut(3,OFFSET_FORECE);
   }
   
   else if(45.0f < deg && deg <= 135.0f){
     calcMotorForce(3, 2, fx, fy);
+    motorOut(0,OFFSET_FORECE);
+    motorOut(1,OFFSET_FORECE);
   }
   else if((135.0f < deg && deg <= 180.0f) ||
     (-180.0f < rad && rad <= -135.0f)){
     calcMotorForce(0, 3, fx, fy);
+    motorOut(1,OFFSET_FORECE);
+    motorOut(2,OFFSET_FORECE);
   }
   else if(-135.0f < deg && deg <= -45.0f){
     calcMotorForce(1, 0, fx, fy);
+    motorOut(2,OFFSET_FORECE);
+    motorOut(3,OFFSET_FORECE);
   }
   else{
     calcMotorForce(1,0,0,0);
@@ -187,9 +196,12 @@ void calcMotorForce(int m1, int m2, float fx, float fy){
 motor:動かすモータ番号，value:値
 */
 void motorOut(int motor, int value){
-  if(value < OFFSET_FORECE)
+  if(fabs(value) < OFFSET_FORECE)
     value = OFFSET_FORECE;
   ledcWrite(motor,constrain(fabs(value),COUNT_LOW,COUNT_HIGH));
+
+  if(motor == 0)
+    dacWrite(debugA,(int)fabs(value/4));
 }
 
 float aveFilter(int axis, short currentForce){
