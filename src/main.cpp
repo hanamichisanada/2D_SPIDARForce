@@ -4,7 +4,6 @@
 #define COUNT_LOW 0
 #define COUNT_HIGH 1023
 #define ENC_MAX 2000
-#define PULLY_R 1.0 //仮の数字
 #define OFFSET_FORECE 80
 #define TAP 100 //平均化フィルタのタップ数
 
@@ -36,7 +35,7 @@ int debugA = 25; //デバッグ用ピンA
 int debugB = 26; //デバッグ用ピンB
 
 //モータの仮想的な座標
-int motorPos[4][2] = {{-1,-1}, {1,-1}, {1,1}, {-1,1}};
+float motorPos[4][2] = {{-1,-1}, {1,-1}, {1,1}, {-1,1}};
 
 int PWM_HZ = 40000;
 
@@ -95,14 +94,9 @@ void setup() {
 void loop() {
 
   calcPos();
-  //motorsReset();
   sendSerial();
   receiveSerial();
-  //motorsReset();
-  //short fx = aveFilter(0, shortFx);
-  //short fy = aveFilter(1, shortFy);
-  //forceFeedback(fx,fy);
-  forceFeedback(shortFx,shortFy);
+  forceFeedback((float)shortFx,(float)shortFy);
 }
 
 void motorsReset(){
@@ -124,7 +118,7 @@ void calcPos(){
   l2 -= 8000;
   l3 -= 8000;
 
-  //Serial.println(l3);
+  //Serial.println(l0);
   posY = (l1*l1 - l2*l2)/400000;
   posX = (l0*l0 - l1*l1)/400000;
 }
@@ -138,34 +132,42 @@ void forceFeedback(float fx, float fy){
   float deg = 180*rad/PI;
   debugDeg =  deg;
 
+  if(fx == 0.0f && fy == 0.0f){
+    motorsReset();
+  }
+
   //Serial.println(deg);
   //motorsReset();
-
-  if(-45.0f < deg && deg < 45.0f){
-    calcMotorForce(2, 1, fx, fy);
-    motorOut(0,OFFSET_FORECE);
-    motorOut(3,OFFSET_FORECE);
-  }
-  
-  else if(45.0f < deg && deg <= 135.0f){
-    calcMotorForce(3, 2, fx, fy);
-    motorOut(0,OFFSET_FORECE);
-    motorOut(1,OFFSET_FORECE);
-  }
-  else if((135.0f < deg && deg <= 180.0f) ||
-    (-180.0f < rad && rad <= -135.0f)){
-    calcMotorForce(0, 3, fx, fy);
-    motorOut(1,OFFSET_FORECE);
-    motorOut(2,OFFSET_FORECE);
-  }
-  else if(-135.0f < deg && deg <= -45.0f){
-    calcMotorForce(1, 0, fx, fy);
-    motorOut(2,OFFSET_FORECE);
-    motorOut(3,OFFSET_FORECE);
-  }
-  else{
-    calcMotorForce(1,0,0,0);
-    //Serial.println("Error");
+  else {
+    if(-45.0f < deg && deg <= 45.0f){
+      calcMotorForce(2, 1, fx, fy);
+      motorOut(0,OFFSET_FORECE);
+      motorOut(3,OFFSET_FORECE);
+    }
+    
+    else if(45.0f < deg && deg <= 135.0f){
+      calcMotorForce(3, 2, fx, fy);
+      motorOut(0,OFFSET_FORECE);
+      motorOut(1,OFFSET_FORECE);
+      dacWrite(debugA, (int)fy);
+    }
+    else if((135.0f < deg && deg <= 180.0f) ||
+      (-180.0f < deg && deg <= -135.0f)){
+      calcMotorForce(0, 3, fx, fy);
+      motorOut(1,OFFSET_FORECE);
+      motorOut(2,OFFSET_FORECE);
+    }
+    else if(-135.0f < deg && deg <= -45.0f){
+      calcMotorForce(0, 1, fx, fy);
+      motorOut(2,OFFSET_FORECE);
+      motorOut(3,OFFSET_FORECE);
+    }
+    else{
+      calcMotorForce(1,0,0,0);
+      motorOut(2,OFFSET_FORECE);
+      motorOut(3,OFFSET_FORECE);
+      //Serial.println("Error");
+    }
   }
 }
 
@@ -199,9 +201,8 @@ void motorOut(int motor, int value){
   if(fabs(value) < OFFSET_FORECE)
     value = OFFSET_FORECE;
   ledcWrite(motor,constrain(fabs(value),COUNT_LOW,COUNT_HIGH));
-
-  if(motor == 0)
-    dacWrite(debugA,(int)fabs(value/4));
+  //if(motor == 1)
+  //  dacWrite(debugA,(int)value/4);
 }
 
 float aveFilter(int axis, short currentForce){
